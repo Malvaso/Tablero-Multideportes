@@ -1,0 +1,20 @@
+Función		Pin Físico		GPIO		Dirección
+R1				11			GPIO17		Entrada
+R2				13			GPIO27		Entrada
+R3				15			GPIO22		Entrada
+R4				16			GPIO23		Entrada
+C1				18			GPIO24		Salida
+C2				22			GPIO25		Salida
+C3				29			GPIO5		Salida
+C4				31			GPIO6		Salida
+
+Botón	Función
+S1		+ gol local
+S2		- gol local
+S3		+ gol visitante
+S4		- gol visitante
+S5		Iniciar tiempo 
+S6		Pausar tiempo
+S7 		Toggle tiempo ascendente / descendente
+S8		Aumentar período
+S9		Reset total
