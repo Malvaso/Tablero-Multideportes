@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Handball
+Exec=python3 -u /home/ariel/Desktop/TableroMultideportes/handball7.py > /home/ariel/Desktop/TableroMultideportes/log.txt 2>&1
+Path=/home/ariel/Desktop/TableroMultideportes/
+StartupNotify=false
+
