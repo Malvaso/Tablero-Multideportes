@@ -145,7 +145,159 @@ class MarcadorHandball(QWidget):
                 json.dump(estado, f)
         except Exception as e:
             print("Error guardando estado:", e)
+            
+            
+    def cargar_estado(self):
+    
+        #Carga el estado desde ARCHIVO_ESTADO y reconstruye la UI de penales
+        #respetando columnas de muerte súbita (listas de longitud arbitraria).
+        #También recalcula ganador y actualiza la visualización.
+    
+        # valores por defecto en caso de no existir archivo o error
+        estado = None
+        if os.path.exists(self.ARCHIVO_ESTADO):
+            try:
+                with open(self.ARCHIVO_ESTADO, "r") as f:
+                    estado = json.load(f)
+            except Exception as e:
+                print("Error cargando estado desde JSON:", e)
+                estado = None
 
+        if estado:
+            try:
+                self.goles_local = int(estado.get("goles_local", 0))
+                self.goles_visitante = int(estado.get("goles_visitante", 0))
+                self.tiempo = int(estado.get("tiempo", 0))
+                self.periodo = int(estado.get("periodo", 0))
+                self.descendente = bool(estado.get("descendente", False))
+                self.penales_activo = bool(estado.get("penales_activo", False))
+
+                # Cargar listas de penales (pueden tener más de 5 en muerte súbita)
+                penales_local = estado.get("penales_local", ["-"] * 5)
+                penales_visit = estado.get("penales_visitante", ["-"] * 5)
+
+                # garantizar que ambas listas tengan la misma longitud
+                maxlen = max(len(penales_local), len(penales_visit))
+                if len(penales_local) < maxlen:
+                    penales_local = penales_local + ["-"] * (maxlen - len(penales_local))
+                if len(penales_visit) < maxlen:
+                    penales_visit = penales_visit + ["-"] * (maxlen - len(penales_visit))
+
+                self.penales_local = penales_local
+                self.penales_visitante = penales_visit
+
+            except Exception as e:
+                print("Error aplicando campos del estado:", e)
+                # mantener valores por defecto en caso de problemas
+        else:
+            # No hay estado guardado: mantener defaults
+            self.penales_local = ["-"] * 5
+            self.penales_visitante = ["-"] * 5
+
+        # -----------------------
+        # (Re)construir widgets de penales según las listas cargadas
+        # -----------------------
+        try:
+            # Limpiar widgets anteriores
+            for lbl in getattr(self, "penales_local_labels", []) + getattr(self, "penales_visit_labels", []):
+                try:
+                    lbl.deleteLater()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        self.penales_local_labels = []
+        self.penales_visit_labels = []
+
+        # Asegurar que row_local / row_visit existen (normalmente creados en initUI)
+        if not hasattr(self, "row_local") or not hasattr(self, "row_visit"):
+            try:
+                lf = self.penales_frame.layout()
+                # asumimos estructura: 0:title, 1:row_local, 2:row_visit
+                self.row_local = lf.itemAt(1).layout()
+                self.row_visit = lf.itemAt(2).layout()
+            except Exception:
+                # crear layouts si algo raro pasó
+                self.row_local = QHBoxLayout()
+                self.row_visit = QHBoxLayout()
+                self.penales_frame.layout().addLayout(self.row_local)
+                self.penales_frame.layout().addLayout(self.row_visit)
+
+        # Construir labels según la longitud actual de las listas
+        base_now = max(10, int(self.height() / 18))
+        font_sym = QFont("Arial", int(base_now * 1.4))
+        label_font = QFont("Arial", int(base_now * 1.0))
+
+        for i in range(len(self.penales_local)):
+            # local label
+            a = QLabel(self.penales_local[i] if i < len(self.penales_local) else "-")
+            a.setAlignment(Qt.AlignCenter)
+            a.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            a.setFont(font_sym)
+            self.penales_local_labels.append(a)
+            self.row_local.addWidget(a)
+
+        for i in range(len(self.penales_visitante)):
+            # visitante label
+            b = QLabel(self.penales_visitante[i] if i < len(self.penales_visitante) else "-")
+            b.setAlignment(Qt.AlignCenter)
+            b.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            b.setFont(font_sym)
+            self.penales_visit_labels.append(b)
+            self.row_visit.addWidget(b)
+
+        # Asegurar que etiquetas "L:" y "V:" mantengan fuente consistente
+        if hasattr(self, "lbl_penales_L"):
+            self.lbl_penales_L.setFont(label_font)
+        if hasattr(self, "lbl_penales_V"):
+            self.lbl_penales_V.setFont(label_font)
+
+        # -----------------------
+        # Re-evaluar ganador y UI
+        # -----------------------
+        try:
+            # recalcular ganador a partir del estado cargado
+            self.chequear_ganador()
+        except Exception as e:
+            print("Error al chequear ganador tras cargar estado:", e)
+
+        # Ajustar tamaños y actualizar la vista completa
+        try:
+            self.adjust_font_sizes()
+        except Exception:
+            pass
+
+        # Visibilidad del panel de penales según estado
+        if getattr(self, "penales_activo", False):
+            self.penales_frame.setVisible(True)
+            self.lbl_tiempo.setVisible(False)
+            self.lbl_estado.setVisible(False)
+            self.lbl_periodo.setVisible(False)
+            self.lbl_modo.setVisible(False)
+        else:
+            self.penales_frame.setVisible(False)
+            self.lbl_tiempo.setVisible(True)
+            self.lbl_estado.setVisible(True)
+            self.lbl_periodo.setVisible(True)
+            self.lbl_modo.setVisible(True)
+
+        # Finalmente, actualizar resto de la UI (scores, periodo, modo, menú)
+        try:
+            self.lbl_local_score.setText(str(self.goles_local))
+            self.lbl_visit_score.setText(str(self.goles_visitante))
+            self.lbl_periodo.setText(self.periodos[self.periodo])
+            self.lbl_modo.setText("Modo: DESCENDENTE" if self.descendente else "Modo: ASCENDENTE")
+            # tiempo mostrado según valor actual
+            if not self.penales_activo:
+                self.lbl_tiempo.setText(self._format_time(self.tiempo))
+            self.lbl_estado.setText("Contando..." if self.contando else "Pausado")
+            self.actualizar_penales_ui()
+            self.render_menu()
+        except Exception:
+            pass
+            
+    """
     def cargar_estado(self):
         if os.path.exists(self.ARCHIVO_ESTADO):
             try:
@@ -164,7 +316,7 @@ class MarcadorHandball(QWidget):
 
         # Aplicar visual
         self.actualizar_ui_completa(startup=True)
-
+    """
     def guardar_si_contando(self):
         if self.contando:
             self.guardar_estado()
